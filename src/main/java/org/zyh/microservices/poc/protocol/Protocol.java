@@ -9,6 +9,6 @@ public interface Protocol {
 
     <T> T provide(Class apiInterface, T object);
 
-    <T> T reference(T object);
+    <T> T reference(Class<T> apiInterface);
 
 }
