@@ -90,7 +90,7 @@ public class ServiceRegistry {
         return classInstanceMap.get(clazz);
     }
 
-    public void putInstance(Class userClazz, Object instance) {
+    public void addInstance(Class userClazz, Object instance) {
         classInstanceMap.put(userClazz, instance);
     }
 

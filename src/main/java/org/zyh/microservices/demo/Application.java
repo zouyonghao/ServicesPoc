@@ -10,7 +10,7 @@ public class Application {
     public static void main(String[] args) throws ClassNotFoundException {
         ServiceRegistry registry = new ServiceRegistry();
         ServiceProvider provider = new ServiceProvider();
-        registry.putInstance(ServiceProvider.class, provider);
+        registry.addInstance(ServiceProvider.class, provider);
         registry.addProtocol(new FakeProtocol());
 
         registry.scan("org.zyh.microservices.demo");
