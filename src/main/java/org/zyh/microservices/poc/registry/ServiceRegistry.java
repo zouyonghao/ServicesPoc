@@ -2,14 +2,19 @@ package org.zyh.microservices.poc.registry;
 
 import io.github.lukehutch.fastclasspathscanner.FastClasspathScanner;
 import org.zyh.microservices.poc.annotation.Api;
+import org.zyh.microservices.poc.annotation.FlexibleApi;
 import org.zyh.microservices.poc.annotation.Provider;
 import org.zyh.microservices.poc.annotation.Reference;
 import org.zyh.microservices.poc.annotation.SoftImpl;
+import org.zyh.microservices.poc.model.ProviderDefinition;
+import org.zyh.microservices.poc.model.ReferenceDefinition;
 import org.zyh.microservices.poc.protocol.Protocol;
 
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,8 +27,12 @@ public class ServiceRegistry {
     private final Map<Class, Object> providerMap = new HashMap<Class, Object>();
     private final Map<Class, Object> referenceMap = new HashMap<>();
     private final Map<Class, Object> classInstanceMap = new HashMap<>();
+    private final List<ProviderDefinition> providerDefinitions = new LinkedList<>();
+    private final List<ReferenceDefinition> referenceDefinitions = new LinkedList<>();
 
     public void scan(String packageName) {
+        int providerCount = 0;
+        int referenceCount = 0;
         for (String s : new FastClasspathScanner(packageName).scan().getNamesOfAllClasses()) {
             try {
                 Class clazz = Class.forName(s);
@@ -35,21 +44,31 @@ public class ServiceRegistry {
                     if (softImpl == null) {
                         throw new IllegalStateException("not a provider");
                     }
-                    String serviceName = softImpl.value();
-                    Class apiInterface = Class.forName(serviceName);
+                    String apiClassName = softImpl.value();
+                    Class apiInterface = Class.forName(apiClassName);
                     org.zyh.microservices.poc.annotation.Protocol protocol =
                             findAnnotation(apiInterface, org.zyh.microservices.poc.annotation.Protocol.class);
                     if (null == protocol) {
                         throw new IllegalStateException("must provide with a protocol");
                     }
-                    // 2. try get a protocol
-                    Protocol protocolInstance = getProtocol(protocol.name());
-                    // 3. try get a object
-                    Object instance = getInstance(clazz);
-                    // 4. try provide
-                    Object providerObject = protocolInstance.provide(apiInterface, instance);
-                    // 5. add provider, may add to other container
-                    addProvider(apiInterface, providerObject);
+                    FlexibleApi flexibleApi = findAnnotation(apiInterface, FlexibleApi.class);
+                    String serviceName = flexibleApi.value();
+//                    // 2. try get a protocol
+//                    Protocol protocolInstance = getProtocol(protocol.name());
+//                    // 3. try get a object
+//                    Object instance = getInstance(clazz);
+//                    // 4. try provide
+//                    Object providerObject = protocolInstance.provide(apiInterface, instance);
+//                    // 5. add provider, may add to other container
+//                    addProvider(apiInterface, providerObject);
+                    ProviderDefinition providerDefinition = new ProviderDefinition();
+                    providerDefinition.setServiceName(serviceName);
+                    providerDefinition.setName(serviceName + "#provider#" + providerCount);
+                    providerDefinition.setProtocol(protocol.name());
+                    providerDefinition.setOriginalClass(clazz);
+                    providerDefinition.setService(apiInterface);
+                    providerDefinitions.add(providerDefinition);
+                    providerCount++;
                     continue;
                 }
                 Reference reference = findAnnotation(clazz, Reference.class);
@@ -60,22 +79,41 @@ public class ServiceRegistry {
                     if (api == null) {
                         throw new IllegalStateException("not a reference");
                     }
+
+                    FlexibleApi flexibleApi = findAnnotation(clazz, FlexibleApi.class);
+                    String serviceName = flexibleApi.value();
                     // 2. try get a protocol
                     org.zyh.microservices.poc.annotation.Protocol protocol =
                             findAnnotation(clazz, org.zyh.microservices.poc.annotation.Protocol.class);
                     if (null == protocol) {
                         throw new IllegalStateException("must reference with a protocol");
                     }
-                    Protocol protocolInstance = getProtocol(protocol.name());
-                    // 3. try reference
-                    Object referenceObject = protocolInstance.reference(clazz);
-                    // 4. add reference
-                    addReference(clazz, referenceObject);
+//                    Protocol protocolInstance = getProtocol(protocol.name());
+//                    // 3. try reference
+//                    Object referenceObject = protocolInstance.reference(clazz);
+//                    // 4. add reference
+//                    addReference(clazz, referenceObject);
+
+                    ReferenceDefinition referenceDefinition = new ReferenceDefinition();
+                    referenceDefinition.setServiceName(serviceName);
+                    referenceDefinition.setName(serviceName + "#reference#" + referenceCount);
+                    referenceDefinition.setProtocol(protocol.name());
+                    referenceDefinition.setService(clazz);
+                    referenceDefinitions.add(referenceDefinition);
+                    referenceCount++;
                 }
             } catch (ClassNotFoundException e) {
                 // ignore
             }
         }
+    }
+
+    public List<ProviderDefinition> getProviderDefinitions() {
+        return providerDefinitions;
+    }
+
+    public List<ReferenceDefinition> getReferenceDefinitions() {
+        return referenceDefinitions;
     }
 
     protected void addReference(Class clazz, Object referenceObject) {
